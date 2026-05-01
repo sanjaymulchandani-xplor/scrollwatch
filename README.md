@@ -63,7 +63,7 @@ Plug and unplug your receiver. You should see:
 
 Press `Ctrl-C` to stop.
 
-## Step 5: Run at login (optional)
+## Step 5: Run at login (optional) - still a WIP 🚧
 
 ```bash
 cp com.user.scrollwatch.plist ~/Library/LaunchAgents/
