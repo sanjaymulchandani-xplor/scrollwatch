@@ -14,6 +14,8 @@
 /* Modern IOKit class first; fall back to legacy name if nothing is found */
 static const char *CLASSES[] = { "IOUSBHostDevice", "IOUSBDevice", NULL };
 
+static int machine_mode = 0;
+
 static void cf_str(io_object_t entry, const char *prop, char *buf, size_t len)
 {
     buf[0] = '\0';
@@ -69,19 +71,21 @@ static int list_class(const char *iokit_class, const char *filter)
         cf_str(svc, "USB Vendor Name", mfr, sizeof(mfr));
         if (!mfr[0]) cf_str(svc, "Manufacturer", mfr, sizeof(mfr));
 
-        printf("  Name        : %s\n", name);
-        if (mfr[0])
-            printf("  Manufacturer: %s\n", mfr);
-        printf("  idVendor    : %d (0x%04X)\n", vendor, (unsigned)vendor);
-        printf("  idProduct   : %d (0x%04X)\n", product, (unsigned)product);
-        printf("  IOKit class : %s\n", iokit_class);
-        printf("\n");
-        printf("  scrollwatch config:\n");
-        printf("    #define MOUSE_KEYWORD   \"%s\"\n", name);
-        printf("    #define MOUSE_VENDOR_ID  %d\n", vendor);
-        printf("    #define IOKIT_CLASS     \"%s\"\n", iokit_class);
-        printf("\n");
-        printf("  ─────────────────────────────────────────\n\n");
+        if (machine_mode) {
+            printf("%s|%d|%s\n", name, vendor, iokit_class);
+        } else {
+            printf("  Name        : %s\n", name);
+            if (mfr[0])
+                printf("  Manufacturer: %s\n", mfr);
+            printf("  idVendor    : %d (0x%04X)\n", vendor, (unsigned)vendor);
+            printf("  idProduct   : %d (0x%04X)\n", product, (unsigned)product);
+            printf("  IOKit class : %s\n", iokit_class);
+            printf("\n");
+            printf("  scrollwatch config:\n");
+            printf("    ./scrollwatch \"%s\" %d\n", name, vendor);
+            printf("\n");
+            printf("  ─────────────────────────────────────────\n\n");
+        }
 
         found++;
         IOObjectRelease(svc);
@@ -92,12 +96,20 @@ static int list_class(const char *iokit_class, const char *filter)
 
 int main(int argc, char *argv[])
 {
-    const char *filter = argc > 1 ? argv[1] : NULL;
+    const char *filter = NULL;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-m") == 0)
+            machine_mode = 1;
+        else
+            filter = argv[i];
+    }
 
+    if (!machine_mode) {
     if (filter)
         printf("Searching for USB devices matching \"%s\" ...\n\n", filter);
     else
         printf("Listing all USB devices ...\n\n");
+    }
 
     int total = 0;
     for (int i = 0; CLASSES[i]; i++) {
@@ -108,11 +120,13 @@ int main(int argc, char *argv[])
     }
 
     if (total == 0) {
+        if (!machine_mode) {
         if (filter)
             printf("No devices found matching \"%s\".\n"
                    "Try running without a filter to see all devices.\n", filter);
         else
             printf("No USB devices found.\n");
+        }
     }
 
     return 0;

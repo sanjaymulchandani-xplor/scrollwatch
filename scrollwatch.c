@@ -1,6 +1,7 @@
 /*
- * scrollwatch.c — toggles Natural Scrolling on Logitech USB receiver connect/disconnect.
+ * scrollwatch.c — toggles Natural Scrolling when a USB receiver is plugged in or out.
  * Build: clang scrollwatch.c -framework IOKit -framework CoreFoundation -o scrollwatch
+ * Usage: ./scrollwatch <keyword> [vendor_id]
  */
 
 #include <stdio.h>
@@ -14,14 +15,10 @@
 #include <dispatch/dispatch.h>
 
 
-/* Logitech dongles report "Wireless Receiver" to IOKit, not "Logitech".
- * Check yours: ioreg -r -c IOUSBDevice 2>/dev/null | grep "USB Product Name" */
-#define MOUSE_KEYWORD "Wireless Receiver"
-
-/* Logitech vendor ID = 1133 (0x046D). Set to 0 to match by keyword only. */
-#define MOUSE_VENDOR_ID 1133
-
 #define IOKIT_CLASS "IOUSBHostDevice"
+
+static const char *g_keyword   = NULL;
+static int         g_vendor_id = 0;
 
 #define ACTIVATE_SETTINGS                                              \
     "/System/Library/PrivateFrameworks/SystemAdministration.framework" \
@@ -116,9 +113,9 @@ static int device_matches(io_object_t service, char *name_out, size_t name_len)
         strncpy(name_out, "<unknown>", name_len - 1);
         return 0;
     }
-    if (!strcasestr(name_out, MOUSE_KEYWORD))
+    if (!strcasestr(name_out, g_keyword))
         return 0;
-    if (MOUSE_VENDOR_ID != 0 && get_vendor_id(service) != MOUSE_VENDOR_ID)
+    if (g_vendor_id != 0 && get_vendor_id(service) != g_vendor_id)
         return 0;
     return 1;
 }
@@ -171,12 +168,21 @@ static void on_disconnect(void *refcon, io_iterator_t iterator)
     }
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
-    char startup[128];
+    if (argc < 2 || argc > 3) {
+        fprintf(stderr, "Usage: scrollwatch <keyword> [vendor_id]\n");
+        fprintf(stderr, "  keyword    : device name substring (case-insensitive)\n");
+        fprintf(stderr, "  vendor_id  : numeric idVendor; 0 or omit to skip check\n");
+        return 1;
+    }
+    g_keyword   = argv[1];
+    g_vendor_id = argc == 3 ? atoi(argv[2]) : 0;
+
+    char startup[256];
     snprintf(startup, sizeof(startup),
              "scrollwatch starting  keyword=\"%s\"  vendor_id=%d",
-             MOUSE_KEYWORD, MOUSE_VENDOR_ID);
+             g_keyword, g_vendor_id);
     log_line(startup);
 
     /* kIOMasterPortDefault was renamed kIOMainPortDefault in macOS 12 */
