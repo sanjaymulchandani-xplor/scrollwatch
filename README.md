@@ -6,6 +6,7 @@ Toggles macOS Natural Scrolling automatically when a USB mouse receiver is plugg
 
 - `find_device.c`: finds your device's name, vendor ID, and IOKit class
 - `scrollwatch.c`: the daemon that watches for plug/unplug and toggles scrolling
+- `install.sh`: generates a launchd plist and loads the daemon at login
 
 ## Step 1: Find your device
 
@@ -63,14 +64,14 @@ Plug and unplug your receiver. You should see:
 
 Press `Ctrl-C` to stop.
 
-## Step 5: Run at login (optional) - still a WIP 🚧
+## Step 5: Run at login
 
 ```bash
-cp com.user.scrollwatch.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.user.scrollwatch.plist
+chmod +x install.sh
+./install.sh
 ```
 
-Make sure the plist points to the correct binary path before loading.
+This generates the launchd plist with the correct binary path, installs it, and starts the daemon. It will run automatically at every login and restart if it crashes.
 
 To stop it:
 
