@@ -14,16 +14,10 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <dispatch/dispatch.h>
 
-
 #define IOKIT_CLASS "IOUSBHostDevice"
 
-static const char *g_keyword   = NULL;
-static int         g_vendor_id = 0;
-
-#define ACTIVATE_SETTINGS                                              \
-    "/System/Library/PrivateFrameworks/SystemAdministration.framework" \
-    "/Resources/activateSettings"
-
+static const char *g_keyword = NULL;
+static int g_vendor_id = 0;
 
 static void log_line(const char *msg)
 {
@@ -53,13 +47,22 @@ static int run(const char *argv[])
 
 static void apply_scroll(int natural)
 {
+    /* Persist across reboots */
     const char *value = natural ? "true" : "false";
     const char *defaults_argv[] = {
         "/usr/bin/defaults", "write", "-g",
         "com.apple.swipescrolldirection", "-bool", value, NULL};
     run(defaults_argv);
-    const char *activate_argv[] = {ACTIVATE_SETTINGS, "-u", NULL};
-    run(activate_argv);
+
+    /* Apply immediately via HID layer (no logout required).
+     * HIDScrollInvertAcceleration 1 = traditional (non-natural), 0 = natural. */
+    const char *invert = natural ? "0" : "1";
+    char hidutil_json[64];
+    snprintf(hidutil_json, sizeof(hidutil_json),
+             "{\"HIDScrollInvertAcceleration\":%s}", invert);
+    const char *hidutil_argv[] = {
+        "/usr/bin/hidutil", "property", "--set", hidutil_json, NULL};
+    run(hidutil_argv);
 }
 
 static int get_device_name(io_object_t service, char *buf, size_t len)
@@ -170,13 +173,14 @@ static void on_disconnect(void *refcon, io_iterator_t iterator)
 
 int main(int argc, char *argv[])
 {
-    if (argc < 2 || argc > 3) {
+    if (argc < 2 || argc > 3)
+    {
         fprintf(stderr, "Usage: scrollwatch <keyword> [vendor_id]\n");
         fprintf(stderr, "  keyword    : device name substring (case-insensitive)\n");
         fprintf(stderr, "  vendor_id  : numeric idVendor; 0 or omit to skip check\n");
         return 1;
     }
-    g_keyword   = argv[1];
+    g_keyword = argv[1];
     g_vendor_id = argc == 3 ? atoi(argv[2]) : 0;
 
     char startup[256];
